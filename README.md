@@ -1,9 +1,9 @@
-# secbox     
+# secbox  
 This is a simple module which show the process of LSM controlling      
 ===================================================================     
-1:	run Makefile to produce sec_box.ko     
-2:	insmod sec_box.ko verified in kernel 2.6.32-431(Centos-6.5)     
-3:	run sec_box_control to communicate with kernel module       
+1:	run Makefile to produce sec_box.ko    
+2:	insmod sec_box.ko verified in kernel 2.6.32-431(Centos-6.5)   
+3:	run sec_box_control to communicate with kernel module  
 ===================================================================      
 </br>
 There will be two list of file in /var/log!        
