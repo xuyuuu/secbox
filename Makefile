@@ -1,7 +1,7 @@
 obj-m := sec_box.o
 sec_box-objs := sec_box_init.o sec_box_blacklist.o\
 	sec_box_socket.o sec_box_md5sum.o sec_box_swhook.o\
-	sec_box_accesslist.o
+	sec_box_accesslist.o sec_box_tcpstat.o
 
 KERNELDIR = /lib/modules/$(shell uname -r)/build/
 KERNELBIT = $(shell getconf LONG_BIT)
