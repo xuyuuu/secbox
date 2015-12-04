@@ -15,7 +15,8 @@ enum SEC_BOX_SOCK_TYPE
 {
 	PROCESS_CTL = 0,
 	ACCESS_CTL,
-	LOG_CTL
+	LOG_CTL,
+	NET_CLEAR
 };
 
 typedef struct sec_box_socket_ctl_s sec_box_socket_ctl_t;
@@ -24,6 +25,12 @@ struct sec_box_socket_ctl_s
 	char action;
 	char degree;
 	u_char file[SEC_BOX_SOCKET_FILE_SIZE];
+}__attribute__((packed));
+
+typedef struct sec_box_net_clear_s sec_box_net_clear_t;
+struct sec_box_net_clear_s
+{
+	ulong inode;
 }__attribute__((packed));
 
 

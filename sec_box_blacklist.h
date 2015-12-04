@@ -7,7 +7,7 @@
 #define SEC_BOX_BLACKLIST_DEGREE_SLIGHT 1
 #define SEC_BOX_BLACKLIST_PROTECT 2
 
-#define SEC_BOX_BLACKLIST_HASHTABLE_SIZE 65525
+#define SEC_BOX_BLACKLIST_HASHTABLE_SIZE (1 << 16)
 #define SEC_BOX_BLACKLIST_HASHTABLE_MASK (SEC_BOX_BLACKLIST_HASHTABLE_SIZE - 1)
 
 enum sec_box_blacklist_rtn{sec_box_blacklist_ok = 0, sec_box_blacklist_error};
