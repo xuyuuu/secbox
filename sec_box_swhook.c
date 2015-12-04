@@ -22,12 +22,28 @@ static int (* old_bprm_check_security)(struct linux_binprm *bprm);
 static int ( *old_file_permission)(struct file *file, int mask);
 static int (*old_bprm_set_creds) (struct linux_binprm *bprm);
 static int (*old_task_kill) (struct task_struct *p, struct siginfo *info, int sig, u32 secid);
+int (*old_inode_create) (struct inode *dir, struct dentry *dentry, int mode);
+void (*old_inode_delete) (struct inode *inode);
 
 
 static void (* sec_box_hook_set_fs_root)(struct fs_struct *, struct path *);
 typedef void (* pfunc)(struct fs_struct *, struct path *);
 
 /*inside function*/
+static int sec_box_hook_inside_inode_create(struct inode *dir, struct dentry *dentry, int mode)
+{
+
+
+	return 0;
+}
+
+static int sec_box_hook_inside_inode_delete(struct inode *inode)
+{
+
+
+	return 0;
+}
+
 static int sec_box_hook_inside_inside_get_fullname(struct path *path, char *d_file, int size)
 {
 	char tmp_buff[512] = {0}, *p = NULL;
@@ -277,11 +293,15 @@ static int sec_box_hook_set_newhook(struct security_operations *security_point)
 	old_file_permission	= security_point->file_permission;
 	old_bprm_set_creds	= security_point->bprm_set_creds;
 	old_task_kill		= security_point->task_kill;
+	old_inode_create	= security_point->inode_create;
+	old_inode_delete	= security_point->inode_delete;
 
 	security_point->bprm_check_security = sec_box_hook_inside_bprm_check_security;
 	security_point->file_permission     = sec_box_hook_inside_file_permission;
 	security_point->bprm_set_creds	    = sec_box_hook_inside_bprm_set_creds;
 	security_point->task_kill	    = sec_box_hook_task_kill;
+	security_point->inode_create	    = sec_box_hook_inside_inode_create;
+	security_point->inode_delete	    = sec_box_hook_inside_inode_delete;
 
 	/*other function point*/
 	sec_box_hook_set_fs_root = (pfunc)0xffffffff811bbfe0;
@@ -295,6 +315,8 @@ static int sec_box_hook_set_oldhook(struct security_operations *security_point)
 	security_point->file_permission     = old_file_permission;
 	security_point->bprm_set_creds	    = old_bprm_set_creds;
 	security_point->task_kill	    = old_task_kill;
+	security_point->inode_create	    = old_inode_create;
+	security_point->inode_delete	    = old_inode_delete;
 
 	return 0;
 }
