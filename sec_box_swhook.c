@@ -5,14 +5,19 @@
 #include <linux/list.h>
 #include <linux/fs_struct.h>
 #include <linux/sched.h>
+#include <linux/net.h>
 #include <asm/current.h>
 #include <asm/signal.h>
 #include <linux/dcache.h>
 #include <linux/fs_struct.h>
+#include <linux/stat.h>
+//#include <net/inet_common.h>
+#include <net/sock.h>
 
 #include "sec_box_swhook.h"
 #include "sec_box_blacklist.h"
 #include "sec_box_accesslist.h"
+#include "sec_box_tcpstat.h"
 #include "sec_box_md5sum.h"
 
 struct sec_box_hook sec_box_hook;
@@ -24,24 +29,74 @@ static int (*old_bprm_set_creds) (struct linux_binprm *bprm);
 static int (*old_task_kill) (struct task_struct *p, struct siginfo *info, int sig, u32 secid);
 int (*old_inode_create) (struct inode *dir, struct dentry *dentry, int mode);
 void (*old_inode_delete) (struct inode *inode);
+int (*old_inode_mknod) (struct inode *dir, struct dentry *dentry, int mode, dev_t dev);
+int (*old_inode_alloc_security) (struct inode *inode);
+void (*old_inode_free_security) (struct inode *inode);
 
 
 static void (* sec_box_hook_set_fs_root)(struct fs_struct *, struct path *);
 typedef void (* pfunc)(struct fs_struct *, struct path *);
 
 /*inside function*/
-static int sec_box_hook_inside_inode_create(struct inode *dir, struct dentry *dentry, int mode)
+static int sec_box_hook_inside_inode_alloc_security(struct inode *inode)
 {
+	struct socket *d_sock = NULL;
+	struct sec_box_tcpstat_node *node = NULL;
 
+	if(!inode || IS_ERR(inode))
+		goto next;
 
+	if(!S_ISSOCK(inode->i_mode))
+		goto next;
+
+	d_sock = SOCKET_I(inode);
+	if(IS_ERR(d_sock) || !d_sock)
+		goto next;
+
+	node = kmalloc(sizeof(struct sec_box_tcpstat_node), GFP_KERNEL);
+	if(!node)
+		goto next;
+
+	node->i_node = &inode->i_ino;
+	node->socket = d_sock;
+	sec_box_tcpstat.add(node);
+
+next:
 	return 0;
 }
 
-static int sec_box_hook_inside_inode_delete(struct inode *inode)
+static int sec_box_hook_inside_inode_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 {
-
-
 	return 0;
+}
+
+static int sec_box_hook_inside_inode_create(struct inode *dir, struct dentry *dentry, int mode)
+{
+	return 0;
+}
+
+static void sec_box_hook_inside_inode_delete(struct inode *inode)
+{
+	;
+}
+
+static void sec_box_hook_inside_inode_free_security(struct inode *inode)
+{
+	int ret;
+	if(IS_ERR(inode) || !inode)
+		goto next;
+
+	if(!S_ISSOCK(inode->i_mode))
+		goto next;
+
+	ret = sec_box_tcpstat.search(&inode->i_ino);
+	if(sec_box_tcpstat_ok == ret)
+	{
+		sec_box_tcpstat.remove(&inode->i_ino);
+		//printk("------remove sockid : %lu -----\n", inode->i_ino);
+	}
+next:
+	return;
 }
 
 static int sec_box_hook_inside_inside_get_fullname(struct path *path, char *d_file, int size)
@@ -294,14 +349,20 @@ static int sec_box_hook_set_newhook(struct security_operations *security_point)
 	old_bprm_set_creds	= security_point->bprm_set_creds;
 	old_task_kill		= security_point->task_kill;
 	old_inode_create	= security_point->inode_create;
+	old_inode_mknod		= security_point->inode_mknod;
+	old_inode_alloc_security= security_point->inode_alloc_security;
 	old_inode_delete	= security_point->inode_delete;
+	old_inode_free_security = security_point->inode_free_security;
 
 	security_point->bprm_check_security = sec_box_hook_inside_bprm_check_security;
 	security_point->file_permission     = sec_box_hook_inside_file_permission;
 	security_point->bprm_set_creds	    = sec_box_hook_inside_bprm_set_creds;
 	security_point->task_kill	    = sec_box_hook_task_kill;
 	security_point->inode_create	    = sec_box_hook_inside_inode_create;
+	security_point->inode_mknod	    = sec_box_hook_inside_inode_mknod;
 	security_point->inode_delete	    = sec_box_hook_inside_inode_delete;
+	security_point->inode_alloc_security= sec_box_hook_inside_inode_alloc_security;
+	security_point->inode_free_security = sec_box_hook_inside_inode_free_security;
 
 	/*other function point*/
 	sec_box_hook_set_fs_root = (pfunc)0xffffffff811bbfe0;
@@ -316,7 +377,10 @@ static int sec_box_hook_set_oldhook(struct security_operations *security_point)
 	security_point->bprm_set_creds	    = old_bprm_set_creds;
 	security_point->task_kill	    = old_task_kill;
 	security_point->inode_create	    = old_inode_create;
+	security_point->inode_mknod	    = old_inode_mknod;
+	security_point->inode_alloc_security= old_inode_alloc_security;
 	security_point->inode_delete	    = old_inode_delete;
+	security_point->inode_free_security = old_inode_free_security;
 
 	return 0;
 }

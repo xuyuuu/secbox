@@ -12,15 +12,16 @@ struct sec_box_tcpstat_node
 {
 	struct list_head head;
 
-	ulong i_node;
+	ulong *i_node;
+	struct socket *socket;
 };
 
 struct sec_box_tcpstat
 {
 	int (* init)(void);
 	int (* add)(struct sec_box_tcpstat_node *node);
-	int (* remove)(struct sec_box_tcpstat_node *node);
-	int (* search)(struct sec_box_tcpstat_node *node);
+	int (* remove)(ulong *i_node);
+	int (* search)(ulong *i_node);
 	int (* destroy)(void);
 	int (* dump)(void);
 };

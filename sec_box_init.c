@@ -4,10 +4,12 @@
 #include <linux/delay.h>
 #include <linux/types.h>
 #include <linux/list.h>
+#include <net/sock.h>
 
 #include "sec_box_socket.h"
 #include "sec_box_blacklist.h"
 #include "sec_box_accesslist.h"
+#include "sec_box_tcpstat.h"
 #include "sec_box_swhook.h"
 
 struct security_operations * security_point;
@@ -48,6 +50,7 @@ static int __init sec_box_init(void)
 
 	sec_box_accesslist.init();
 	sec_box_blacklist.init();
+	sec_box_tcpstat.init();
 	sec_box_socket.handler();
 
 	return 0;
@@ -67,6 +70,8 @@ static void __exit sec_box_exit(void)
 	printk("release blacklist source success. \n");
 	sec_box_accesslist.destroy();
 	printk("release accesslist source success. \n");
+	sec_box_tcpstat.destroy();
+	printk("release tcpstat source success. \n");
 }
 
 

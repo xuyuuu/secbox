@@ -27,22 +27,22 @@ static int sec_box_tcpstat_init(void)
 
 static int sec_box_tcpstat_add(struct sec_box_tcpstat_node *node)
 {
-	int h = sec_box_tcpstat_simhash(node->i_node);
+	int h = sec_box_tcpstat_simhash((ulong)node->i_node);
 	list_add_tail(&node->head, &sec_box_tcpstat_head[h]);
 
 	return 0;
 }
 
 
-static int sec_box_tcpstat_remove(struct sec_box_tcpstat_node *node)
+static int sec_box_tcpstat_remove(ulong *i_node)
 {
 	int rtn = sec_box_tcpstat_ok;
 	struct sec_box_tcpstat_node *item, *nxt;
-	int h = sec_box_tcpstat_simhash(node->i_node);	
+	int h = sec_box_tcpstat_simhash((ulong)i_node);	
 
 	list_for_each_entry_safe(item, nxt, &sec_box_tcpstat_head[h], head)
 	{
-		if (item->i_node == node->i_node)	
+		if (*(item->i_node) == *i_node)	
 		{
 			list_del(&item->head);
 			kfree(item);
@@ -54,15 +54,15 @@ out:
 	return rtn;
 }
 
-static int sec_box_tcpstat_search(struct sec_box_tcpstat_node *node)
+static int sec_box_tcpstat_search(ulong *i_node)
 {
 	int rtn = sec_box_tcpstat_ok;
 	struct sec_box_tcpstat_node *item;
-	int h = sec_box_tcpstat_simhash(node->i_node);
+	int h = sec_box_tcpstat_simhash((ulong)i_node);
 
 	list_for_each_entry(item, &sec_box_tcpstat_head[h], head)
 	{
-		if(item->i_node == node->i_node)
+		if(*(item->i_node) == *i_node)
 			goto out;
 	}
 	rtn = sec_box_tcpstat_error;
@@ -138,7 +138,7 @@ static int sec_box_tcpstat_dump(void)
 		list_for_each_entry(item, &sec_box_tcpstat_head[i], head)
 		{
 			memset(kern_buff, 0, sizeof(kern_buff));
-			sec_box_tcpstat_intostr(item->i_node, kern_buff);
+			sec_box_tcpstat_intostr(*(item->i_node), kern_buff);
 
 			point = kern_buff;
 			point += strlen(kern_buff);
