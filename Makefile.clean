@@ -1,0 +1,18 @@
+CC=gcc
+LDS=-lpthread
+BIN=sec_box_cleaner
+OBJS=sec_box_netclean.o sec_box_ring.o
+
+all : ${BIN}
+
+${BIN} : ${OBJS}
+	${CC} ${LDS} $^ -o $@
+
+sec_box_netclean.o : sec_box_netclean.c
+	${CC} -c $^ -o $@
+
+sec_box_ring.o : sec_box_ring.c
+	${CC} -c $^ -o $@
+
+clean :
+	rm ${BIN} ${OBJS} -f

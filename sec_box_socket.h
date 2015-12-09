@@ -8,7 +8,8 @@
 enum SEC_BOX_SOCK_ACTION
 {
 	ADD_ACTION = 0,
-	DEL_ACTION
+	DEL_ACTION,
+	CLEAN_ACTION
 };
 
 enum SEC_BOX_SOCK_TYPE
@@ -16,7 +17,7 @@ enum SEC_BOX_SOCK_TYPE
 	PROCESS_CTL = 0,
 	ACCESS_CTL,
 	LOG_CTL,
-	NET_CLEAR
+	NET_CLEAN
 };
 
 typedef struct sec_box_socket_ctl_s sec_box_socket_ctl_t;
@@ -27,9 +28,11 @@ struct sec_box_socket_ctl_s
 	u_char file[SEC_BOX_SOCKET_FILE_SIZE];
 }__attribute__((packed));
 
-typedef struct sec_box_net_clear_s sec_box_net_clear_t;
-struct sec_box_net_clear_s
+typedef struct sec_box_socket_clean_s sec_box_socket_clean_t;
+struct sec_box_socket_clean_s
 {
+	char action;
+
 	ulong inode;
 }__attribute__((packed));
 

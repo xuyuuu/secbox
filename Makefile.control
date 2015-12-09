@@ -1,0 +1,14 @@
+CC=gcc
+BIN=sec_box_control
+OBJS=sec_box_control.o
+
+all : ${BIN}
+
+${BIN} : ${OBJS}
+	${CC} $^ -o $@
+
+${OBJS} : sec_box_control.c
+	${CC} -c $^ -o $@
+
+clean :
+	rm ${BIN} ${OBJS} -f
