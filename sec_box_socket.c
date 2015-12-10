@@ -11,9 +11,30 @@
 #include "sec_box_md5sum.h"
 #include "sec_box_blacklist.h"
 #include "sec_box_accesslist.h"
+#include "sec_box_tcpstat.h"
 
 static struct sock *sec_box_sock;
 struct sec_box_socket sec_box_socket;
+
+static int sec_box_socket_inside_net_clean(struct sk_buff *skb)
+{
+	struct nlmsghdr *nlh;
+	struct sec_box_socket_clean_s *clean;
+
+	nlh = (struct nlmsghdr *)skb->data;
+	if(!NLMSG_OK(nlh, skb->len))
+	{
+		printk("sec_box_socket_receive has error. \n");	
+		goto out;
+	}
+	
+	clean = (sec_box_socket_clean_t *)NLMSG_DATA(nlh);
+	printk("receive inode number : %lu \n", clean->inode);
+	sec_box_tcpstat.release(clean->inode);
+
+out:
+	return 0;
+}
 
 static int sec_box_socket_inside_access_ctl(struct sk_buff *skb)
 {
@@ -153,6 +174,10 @@ static void sec_box_socket_receive(struct sk_buff *skb)
 			printk("receive a log_ctl message .\n");
 			sec_box_blacklist.dump();
 			sec_box_accesslist.dump();
+			break;
+		case NET_CLEAN:
+			printk("receive a net_clean message .\n");
+			sec_box_socket_inside_net_clean(skb);
 			break;
 		default:
 			printk("from pid:[%d] process, message type error. \n", NETLINK_CREDS(skb)->pid);

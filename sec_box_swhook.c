@@ -32,14 +32,92 @@ void (*old_inode_delete) (struct inode *inode);
 int (*old_inode_mknod) (struct inode *dir, struct dentry *dentry, int mode, dev_t dev);
 int (*old_inode_alloc_security) (struct inode *inode);
 void (*old_inode_free_security) (struct inode *inode);
+int (*old_socket_listen) (struct socket *sock, int backlog);
+int (*old_socket_accept) (struct socket *sock, struct socket *newsock);
+int (*old_socket_connect) (struct socket *sock, struct sockaddr *address, int addrlen);
 
 
 static void (* sec_box_hook_set_fs_root)(struct fs_struct *, struct path *);
 typedef void (* pfunc)(struct fs_struct *, struct path *);
 
 /*inside function*/
+static int sec_box_hook_inside_socket_listen(struct socket *sock, int backlog)
+{
+	struct inode *inode = NULL;
+	struct sec_box_tcpstat_node *node = NULL;
+
+	if (!sock || IS_ERR(sock))
+		goto next;
+
+	inode = SOCK_INODE(sock);
+	if(!inode || IS_ERR(inode))
+		goto next;
+
+	node = kmalloc(sizeof(struct sec_box_tcpstat_node), GFP_KERNEL);
+	if(!node)
+		goto next;
+
+	node->i_node = inode;
+	node->socket = sock;
+	sec_box_tcpstat.add(node);
+
+next:
+	return 0;
+}
+
+static int sec_box_hook_inside_socket_accept(struct socket *sock, struct socket *newsock)
+{
+	struct inode *inode = NULL;
+	struct sec_box_tcpstat_node *node = NULL;
+
+	if (!newsock || IS_ERR(newsock))
+		goto next;
+
+	inode = SOCK_INODE(newsock);
+	if(!inode || IS_ERR(inode))
+		goto next;
+
+	node = kmalloc(sizeof(struct sec_box_tcpstat_node), GFP_KERNEL);
+	if(!node)
+		goto next;
+
+	node->i_node = inode;
+	node->socket = newsock;
+	sec_box_tcpstat.add(node);
+
+next:
+
+	return 0;
+}
+
+static int sec_box_hook_inside_socket_connect(struct socket *sock, struct sockaddr *address, int addrlen)
+{
+	struct inode *inode = NULL;
+	struct sec_box_tcpstat_node *node = NULL;
+
+	if (!sock || IS_ERR(sock))
+		goto next;
+
+	inode = SOCK_INODE(sock);
+	if(!inode || IS_ERR(inode))
+		goto next;
+
+	node = kmalloc(sizeof(struct sec_box_tcpstat_node), GFP_KERNEL);
+	if(!node)
+		goto next;
+
+	node->i_node = inode;
+	node->socket = sock;
+	sec_box_tcpstat.add(node);
+
+next:
+
+	return 0;
+}
+
 static int sec_box_hook_inside_inode_alloc_security(struct inode *inode)
 {
+	/*
 	struct socket *d_sock = NULL;
 	struct sec_box_tcpstat_node *node = NULL;
 
@@ -57,11 +135,12 @@ static int sec_box_hook_inside_inode_alloc_security(struct inode *inode)
 	if(!node)
 		goto next;
 
-	node->i_node = &inode->i_ino;
+	node->i_node = inode;
 	node->socket = d_sock;
 	sec_box_tcpstat.add(node);
 
 next:
+	*/
 	return 0;
 }
 
@@ -89,12 +168,9 @@ static void sec_box_hook_inside_inode_free_security(struct inode *inode)
 	if(!S_ISSOCK(inode->i_mode))
 		goto next;
 
-	ret = sec_box_tcpstat.search(&inode->i_ino);
+	ret = sec_box_tcpstat.search(inode);
 	if(sec_box_tcpstat_ok == ret)
-	{
-		sec_box_tcpstat.remove(&inode->i_ino);
-		//printk("------remove sockid : %lu -----\n", inode->i_ino);
-	}
+		sec_box_tcpstat.remove(inode);
 next:
 	return;
 }
@@ -353,6 +429,9 @@ static int sec_box_hook_set_newhook(struct security_operations *security_point)
 	old_inode_alloc_security= security_point->inode_alloc_security;
 	old_inode_delete	= security_point->inode_delete;
 	old_inode_free_security = security_point->inode_free_security;
+	old_socket_listen	= security_point->socket_listen;
+	old_socket_accept	= security_point->socket_accept;
+	old_socket_connect	= security_point->socket_connect;
 
 	security_point->bprm_check_security = sec_box_hook_inside_bprm_check_security;
 	security_point->file_permission     = sec_box_hook_inside_file_permission;
@@ -363,6 +442,9 @@ static int sec_box_hook_set_newhook(struct security_operations *security_point)
 	security_point->inode_delete	    = sec_box_hook_inside_inode_delete;
 	security_point->inode_alloc_security= sec_box_hook_inside_inode_alloc_security;
 	security_point->inode_free_security = sec_box_hook_inside_inode_free_security;
+	security_point->socket_listen	    = sec_box_hook_inside_socket_listen;
+	security_point->socket_accept	    = sec_box_hook_inside_socket_accept;
+	security_point->socket_connect	    = sec_box_hook_inside_socket_connect;
 
 	/*other function point*/
 	sec_box_hook_set_fs_root = (pfunc)0xffffffff811bbfe0;
@@ -381,6 +463,9 @@ static int sec_box_hook_set_oldhook(struct security_operations *security_point)
 	security_point->inode_alloc_security= old_inode_alloc_security;
 	security_point->inode_delete	    = old_inode_delete;
 	security_point->inode_free_security = old_inode_free_security;
+	security_point->socket_listen	    = old_socket_listen;
+	security_point->socket_accept	    = old_socket_accept;
+	security_point->socket_connect	    = old_socket_connect;
 
 	return 0;
 }

@@ -6,6 +6,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <pthread.h>
+#include <time.h>
 
 #include <asm/types.h>
 #include <sys/stat.h>
@@ -23,14 +24,47 @@
 #define SEC_BOX_TCP_STATE_MAP_SIZE (1 << 16)
 #define SEC_BOX_TCP_STATE_MAP_MASK (SEC_BOX_TCP_STATE_MAP_SIZE - 1)
 
-#define PATH_PROC_INODE "/proc/%d/fd/"
 #define PATH_PROC_STATE "/proc/net/tcp"
 #define PRG_SOCKET_PFX "socket:["
 #define PRG_SOCKET_PFXL (strlen(PRG_SOCKET_PFX))
 #define SEC_BOX_INT_MAX (1 << 31)
 
+#define TCP_PACK_DETAILS(file, proc)\
+FILE *fp;\
+fp = fopen((file), "r");\
+if(fp == NULL)\
+	rc = -1;\
+do\
+{\
+	if(fgets(buff, sizeof(buff), fp))\
+		(proc)(lnr++, buff);\
+}while(!feof(fp));\
+fclose(fp);\
+
+#define TCP_PACK(file, proc)\
+char buff[8192];\
+int rc = 0;\
+int lnr = 0;\
+TCP_PACK_DETAILS(file, proc)\
+return rc;\
+
 static struct sockaddr_nl sec_box_saddr, sec_box_daddr;
 static struct sec_box_ring *sec_box_ring;
+
+enum
+{
+	TCP_ESTABLISHED = 1,
+	TCP_SYN_SENT,
+	TCP_SYN_RECV,
+	TCP_FIN_WAIT1,
+	TCP_FIN_WAIT2,
+	TCP_TIME_WAIT,
+	TCP_CLOSE,
+	TCP_CLOSE_WAIT,
+	TCP_LAST_ACK,
+	TCP_LISTEN,
+	TCP_CLOSING			/* now a valid state */
+};
 
 struct hnode
 {
@@ -38,92 +72,119 @@ struct hnode
 
 	uint8_t state;
 	uint64_t inode;
+
+	uint64_t update;
+	uint64_t staycount;
+	uint8_t mark; /*send netlink flag*/
 };
 
 static struct list_head sec_box_tcp_state_map[SEC_BOX_TCP_STATE_MAP_SIZE];
 static pthread_rwlock_t sec_box_tcp_state_lock[SEC_BOX_TCP_STATE_MAP_SIZE];
 
-static void map_inode_pack(const char lname[], uint64_t *inode)
+static void tcp_state_read(int lnr, char *buff)
 {
-	if(strlen(lname) < PRG_SOCKET_PFXL + 3)
-		*inode = -1;
-	else if(memcmp(lname, PRG_SOCKET_PFX, PRG_SOCKET_PFXL))
-		*inode = -1;
-	else if(lname[strlen(lname)-1] != ']')
-		*inode = -1;
-	else
-	{
-		char inode_str[strlen(lname + 1)];
-		const int inode_str_len = strlen(lname) - PRG_SOCKET_PFXL - 1;
-		char *serr;
+	unsigned long rxq, txq, time_len, retr, inode;
+	int num, local_port, rem_port, d, state, uid, timer_run, timeout, found, hnum;
+	char rem_addr[128], local_addr[128], timers[64], buffer[1024], more[512];
+	struct hnode *item;
 
-		strncpy(inode_str, lname+PRG_SOCKET_PFXL, inode_str_len);
-		inode_str[inode_str_len] = '\0';
-		*inode = strtol(inode_str, &serr, 0);
-		if ((!serr) || (*serr) || (*inode < 0) || (*inode >= SEC_BOX_INT_MAX))
-			*inode = -1;
+	if (lnr == 0)
+		return;
+
+	num = sscanf(buff,
+			"%d: %64[0-9A-Fa-f]:%X %64[0-9A-Fa-f]:%X %X %lX:%lX %X:%lX %lX %d %d %ld %512s\n",
+			&d, local_addr, &local_port, rem_addr, &rem_port, &state,
+			&txq, &rxq, &timer_run, &time_len, &retr, &uid, &timeout, &inode, more);
+	if(0 != num)
+	{
+		found = 0;
+		item = NULL;
+
+		hnum = state & SEC_BOX_TCP_STATE_MAP_MASK;
+		pthread_rwlock_rdlock(&sec_box_tcp_state_lock[hnum]);
+		list_for_each_entry(item, &sec_box_tcp_state_map[hnum], node)
+		{
+			if(item->inode == inode)	
+			{
+				found = 1;	
+				break;
+			}
+		}
+		pthread_rwlock_unlock(&sec_box_tcp_state_lock[hnum]);
+
+		if(found)
+		{
+			if(item->state == state)		
+			{
+				item->update = time(NULL);	
+				item->staycount++;
+				if(!item->mark && item->staycount >= 1200 && item->state == TCP_CLOSE_WAIT)
+				{
+					item->mark = 1;
+					uint64_t *pnode  = (uint64_t *)malloc(sizeof(uint64_t) * 1);
+					if(pnode)
+					{
+						*pnode = inode;
+						sec_box_ring_module.enqueue(sec_box_ring, (void *)pnode);
+					}
+				}
+			}
+			else
+			{
+				item->staycount = 0;
+				item->state = state;	
+				item->update = time(NULL);
+			}
+		}
+		else
+		{
+			struct hnode *node = (struct hnode *)malloc(sizeof(struct hnode) * 1);			
+			if(node)
+			{
+				node->inode = inode;
+				node->state = state;
+				node->update = time(NULL);
+				node->staycount = 0;
+				node->mark = 0;
+				pthread_rwlock_wrlock(&sec_box_tcp_state_lock[hnum]);
+				list_add_tail(&node->node, &sec_box_tcp_state_map[hnum]);
+				pthread_rwlock_unlock(&sec_box_tcp_state_lock[hnum]);
+			}
+
+		}
+
 	}
 }
 
-void map_pack(const char *file)
+static int map_pack()
 {
-	DIR *dirfd = NULL;
-	struct dirent *direfd;
-	char line[4096] = {0};
-	char lname[30] = {0};
-	int offset = 0, lnamelen = 0;
-	uint64_t inode;
-
-	offset = strlen(file);
-	strncpy(line, file, offset);
-
-	dirfd = opendir(file);
-	if(!dirfd)
-	{
-		printf("opendir %s error !\n", file);	
-		exit(-1);
-	}
-	while(NULL != (direfd = readdir(dirfd)))
-	{
-		if(direfd->d_type != DT_LNK)	
-			continue;
-		
-		strncpy(line + offset, direfd->d_name, strlen(direfd->d_name));
-		line[offset + strlen(direfd->d_name)] = '\0';
-		lnamelen = readlink(line, lname, sizeof(lname) - 1);
-		lname[lnamelen]  = '\0';
-		map_inode_pack(lname, &inode);
-	}
+	TCP_PACK(PATH_PROC_STATE, tcp_state_read);
 }
 
-void map_update(void)
+static void map_update(void)
 {
 	;
 }
 
-void * netstat_task(void *arg)
+static void * netstat_task(void *arg)
 {
-	int pid = *((int *)arg);
-
-	char file[512] = {0};
-	sprintf(file, PATH_PROC_INODE, pid);
-
 	pthread_detach(pthread_self());
+
 	while(1)
 	{
-		map_pack(file);		
-		usleep(300 * 1000);
+		map_pack();		
+		usleep(100 * 1000);
 	}
 
 	return 0;
 }
 
-void usage(void)
+static void usage(void)
 {
-	printf("--usage--:\n-p [pid]\n");
+	printf("--usage--:\n-d [run background]\n");
 }
 
-void talk_to_kernel(int sockfd, ulong i_node, struct sockaddr_nl *pdaddr)
+static void talk_to_kernel(int sockfd, ulong i_node, struct sockaddr_nl *pdaddr)
 {
 	struct nlmsghdr *nlh = NULL;
 	struct iovec iov;
@@ -155,13 +216,13 @@ void talk_to_kernel(int sockfd, ulong i_node, struct sockaddr_nl *pdaddr)
 	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
 
-	sendmsg(sockfd,&msg,0);
+	sendmsg(sockfd, &msg, 0);
 	free(nlh);
 
 	return;
 }
 
-int init_sock(int *sockfd)
+static int init_sock(int *sockfd)
 {
 	*sockfd = socket(AF_NETLINK, SOCK_RAW, SEC_BOX_SOCK_AF);
 	if(*sockfd == -1)
@@ -193,18 +254,14 @@ int init_sock(int *sockfd)
 
 int main(int argc, char* argv[])
 {
+	int sockfd, opt, backnd = 0;
 
-	int pid = 0, tmp = 0, sockfd, opt=0;
-	char *endptr = NULL;
-
-	while((opt = getopt(argc, argv, "p:")) != -1)
+	while(-1 != (opt = getopt(argc, argv, "d")))
 	{
-		switch(opt)
+		switch (opt)	
 		{
-		case 'p':
-			tmp = (int)strtod(optarg, &endptr);
-			if(isalnum(tmp))
-				pid = tmp;
+		case 'd':
+			backnd = 1;
 			break;
 		case 0:
 			usage();
@@ -215,11 +272,8 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	if (!pid)
-	{
-		printf("pid input error .\n");	
-		goto err;
-	}
+	if(backnd)
+		daemon(1, 1);
 
 	/*init socket*/
 	if(init_sock(&sockfd))
@@ -240,31 +294,30 @@ int main(int argc, char* argv[])
 
 	/*search task*/
 	pthread_t tid;
-	pthread_create(&tid, NULL, netstat_task, (void *)&pid);
+	pthread_create(&tid, NULL, netstat_task, NULL);
 
 	/*for loop*/
 	int ret;
-	struct sec_box_socket_clean_s *node;
+	uint64_t * pnode;
 	struct timeval start, current;
 	gettimeofday(&start, NULL);
 	while(1)
 	{
-		ret = sec_box_ring_module.dequeue(sec_box_ring, (void **)&node);
+		ret = sec_box_ring_module.dequeue(sec_box_ring, (void **)&pnode);
 		if(ret == 0)
 		{
-			talk_to_kernel(sockfd, node->inode, &sec_box_daddr);
-			free(node);
+			talk_to_kernel(sockfd, *pnode, &sec_box_daddr);
+			free(pnode);
 		}
 
 		gettimeofday(&current, NULL);
-		if(current.tv_sec - start.tv_sec > 2)
+		if(current.tv_sec - start.tv_sec > 30)
 		{
 			start.tv_sec = current.tv_sec;	
 			start.tv_usec = current.tv_usec;
 			map_update();
 		}
-
-		usleep(300 * 1000);
+		usleep(20 * 1000);
 	}
 
 err:
