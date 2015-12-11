@@ -10,9 +10,9 @@
 =============================================================================
 编译与使用   
 =============================================================================
-平台说明: 在kernel 2.6.32-431(Centos-6.5)平台上编译完成,其他平台需要更改代码.   
+平台说明: 在kernel 2.6.32-431(Centos-6.5)平台上编译完成,其他平台需要更改代码.</br>     
 1.make    
-执行make操作生成内核模块sec_box.ko,首先将内核模块装载进内核系统.   
+执行make操作生成内核模块sec_box.ko,首先将内核模块装载进内核系统.</br>   
 2.make -f Makefile.control   
 生成访问控制交互工具sec_box_control    
 执行'sec_box_control -h'查看命令指令    
@@ -23,8 +23,7 @@
 	<5>运行sec_box_control [命令] 向内核删除进程黑名单    
 	<6>运行sec_box_control [命令] 向内核删除进程灰名单     
 	<7>运行sec_box_control [命令] 向内核删除目录黑名单     
-	<8>运行sec_box_control [命令] 控制内核打印日志文件     
-
+	<8>运行sec_box_control [命令] 控制内核打印日志文件</br>     
 3.make -f Makefile.clean    
 生成资源监控工具sec_box_cleaner    
 直接执行'sec_box_cleaner -d[run in backgroud]'    
