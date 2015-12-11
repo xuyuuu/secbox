@@ -1,32 +1,27 @@
 # secbox</br>   
 =============================================================================
-项目介绍   
+Project Introduction      
 =============================================================================
-这是运行在linux平台上的简单的安全防护工具.   
-针对TCP通信过程中的资源泄漏自动进行清理.   
-对程序运行进行访问控制.   
-对目录访问进行访问控制.   
+This is a security project which needs to run in linux platform.  
+It would cleanup resource with tcp socket.   
+It would avoid running malicious process which in blacklist.   
+It would avoid killing protected process which in protectlist.   
+It would avoid accessing the directory which in blacklist.   
 
 =============================================================================
-编译与使用   
+Build and use    
 =============================================================================
-平台说明: 在kernel 2.6.32-431(Centos-6.5)平台上编译完成,其他平台需要更改代码.</br>     
-1.make    
-执行make操作生成内核模块sec_box.ko,首先将内核模块装载进内核系统.</br>   
-2.make -f Makefile.control   
-生成访问控制交互工具sec_box_control    
-执行'sec_box_control -h'查看命令指令    
-        <1>运行sec_box_control [命令] 向内核添加进程黑名单   
-        <2>运行sec_box_control [命令] 向内核添加进程灰名单     
-        <3>运行sec_box_control [命令] 向内核添加目录黑名单    
-	<4>运行sec_box_control [命令] 向内核添加保护名单,进行kill防杀    
-	<5>运行sec_box_control [命令] 向内核删除进程黑名单    
-	<6>运行sec_box_control [命令] 向内核删除进程灰名单     
-	<7>运行sec_box_control [命令] 向内核删除目录黑名单     
-	<8>运行sec_box_control [命令] 控制内核打印日志文件</br>     
-3.make -f Makefile.clean    
-生成资源监控工具sec_box_cleaner    
-直接执行'sec_box_cleaner -d[run in backgroud]'    
-sec_box_cleaner对TCP通信套接字资源进行定期扫描,发现特定泄漏通知内核进行资源清理.   
+platform Introduction: must build in kernel 2.6.32-431(Centos-6.5).</br>     
+1.Makefile
+run 'make' commond to produce sec_box.ko.   
+insmod the kernel module.</br>   
+2.Makefile.control   
+run 'make -f Makefile.control' commond to produce sec_box_control.    
+run 'sec_box_control -h' commond for help.       
+You can use 'sec_box_control ......' tools to communicate with kernel.   
+
+3.Makefile.clean    
+run 'make -f Makefile.clean' commond to produce sec_box_cleaner.    
+run 'sec_box_cleaner -d[run in backgroud]' to scan tcp state and notify to kernel.   
 
 Thanks for looking !       
