@@ -16,9 +16,9 @@
 2.make -f Makefile.control   
 生成访问控制交互工具sec_box_control    
 执行'sec_box_control -h'查看命令指令    
-	<1>运行sec_box_control [命令] 向内核添加进程黑名单   
-	<2>运行sec_box_control [命令] 向内核添加进程灰名单     
-	<3>运行sec_box_control [命令] 向内核添加目录黑名单    
+        <1>运行sec_box_control [命令] 向内核添加进程黑名单   
+        <2>运行sec_box_control [命令] 向内核添加进程灰名单     
+        <3>运行sec_box_control [命令] 向内核添加目录黑名单    
 	<4>运行sec_box_control [命令] 向内核添加保护名单,进行kill防杀    
 	<5>运行sec_box_control [命令] 向内核删除进程黑名单    
 	<6>运行sec_box_control [命令] 向内核删除进程灰名单     
