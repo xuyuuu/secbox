@@ -1,16 +1,33 @@
 # secbox</br>   
-This is a simple module which show the process of LSM controlling   
-1:run Makefile to produce sec_box.ko   
-2:insmod sec_box.ko verified in kernel 2.6.32-431(Centos-6.5)   
-3:run sec_box_control & sec_box_cleaner to communicate with kernel module   
-</br>
-There will be two list of file in /var/log!        
-DESCRIPTION:      
-1. We can release tcp fd source which is stay in CLOSE_WAIT.   
-2. If the process be put in the protected list, it will avoid killing !      
-3. If the process be put in the gray list, it will run in sandbox !       
-4. If the process be put in the black list, it will avoid running !       
-5. If the access path or file be put in the protected list, it will avoid visiting !      
-6. We can see list logfile in /var/log/sec_box_accesslist.log & /var/log/sec_box_blacklist.log      
-</br>   
+=============================================================================
+项目介绍   
+=============================================================================
+这是运行在linux平台上的简单的安全防护工具.   
+针对TCP通信过程中的资源泄漏自动进行清理.   
+对程序运行进行访问控制.   
+对目录访问进行访问控制.   
+
+=============================================================================
+编译与使用   
+=============================================================================
+平台说明: 在kernel 2.6.32-431(Centos-6.5)平台上编译完成,其他平台需要更改代码.   
+1.make    
+执行make操作生成内核模块sec_box.ko,首先将内核模块装载进内核系统.   
+2.make -f Makefile.control   
+生成访问控制交互工具sec_box_control    
+执行'sec_box_control -h'查看命令指令    
+	<1>运行sec_box_control [命令] 向内核添加进程黑名单   
+	<2>运行sec_box_control [命令] 向内核添加进程灰名单     
+	<3>运行sec_box_control [命令] 向内核添加目录黑名单    
+	<4>运行sec_box_control [命令] 向内核添加保护名单,进行kill防杀    
+	<5>运行sec_box_control [命令] 向内核删除进程黑名单    
+	<6>运行sec_box_control [命令] 向内核删除进程灰名单     
+	<7>运行sec_box_control [命令] 向内核删除目录黑名单     
+	<8>运行sec_box_control [命令] 控制内核打印日志文件     
+
+3.make -f Makefile.clean    
+生成资源监控工具sec_box_cleaner    
+直接执行'sec_box_cleaner -d[run in backgroud]'    
+sec_box_cleaner对TCP通信套接字资源进行定期扫描,发现特定泄漏通知内核进行资源清理.   
+
 Thanks for looking !       
