@@ -24,4 +24,9 @@ You can use 'sec_box_control ......' tools to communicate with kernel.
 run 'make -f Makefile.clean' commond to produce sec_box_cleaner.    
 run 'sec_box_cleaner -d[run in backgroud]' to scan tcp state and notify to kernel.   
 
+4.clean shell
+run './sec_box_netclean.sh -h' for help   
+run 'flock -e sec_box_netclean.lck ./sec_box_netclean.sh ......' to produce file sec_box_netclean.file   
+the program which run above step 3, it will notify dirty resource inode to kernel.   
+
 Thanks for looking !       
