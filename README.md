@@ -27,6 +27,6 @@ run 'sec_box_cleaner -d[run in backgroud]' to scan tcp state and notify to kerne
 4.clean shell
 run './sec_box_netclean.sh -h' for help   
 run 'flock -e sec_box_netclean.lck ./sec_box_netclean.sh ......' to produce file sec_box_netclean.file   
-the program which run above step 3, it will notify dirty resource inode to kernel.   
+the program which run above step 3, it will notify dirty inode to kernel.   
 
 Thanks for looking !       
