@@ -6,6 +6,8 @@
 #include <string.h>
 #include <dirent.h>
 #include <pthread.h>
+#include <fcntl.h>
+#include <limits.h>
 #include <time.h>
 
 #include <asm/types.h>
@@ -28,6 +30,9 @@
 #define PRG_SOCKET_PFX "socket:["
 #define PRG_SOCKET_PFXL (strlen(PRG_SOCKET_PFX))
 #define SEC_BOX_INT_MAX (1 << 31)
+
+#define SEC_BOX_DEFAULT_LOCK "./sec_box_netclean.lck"
+#define SEC_BOX_DEFAULT_FILE "./sec_box_netclean.file"
 
 #define TCP_PACK_DETAILS(file, proc)\
 FILE *fp;\
@@ -222,6 +227,60 @@ static void talk_to_kernel(int sockfd, ulong i_node, struct sockaddr_nl *pdaddr)
 	return;
 }
 
+
+static void sec_box_load_clean_file(int sockfd, struct sockaddr_nl *pdaddr)
+{
+	FILE *fp = NULL;
+	int flck = 0;
+
+	char buff[128];
+	int fsz;
+	ulong inode;
+
+	flck = open(SEC_BOX_DEFAULT_LOCK, O_CREAT | O_RDWR | O_TRUNC, 0666);
+	if(flck <= 0)
+		return;
+	struct flock lck;
+	lck.l_type = F_WRLCK;
+	lck.l_whence = SEEK_SET;
+	lck.l_start = 0;
+	lck.l_len = 0;
+	/*lock*/
+	if (-1 == fcntl(flck, F_SETLK, &lck))
+		goto out;
+
+	fp = fopen(SEC_BOX_DEFAULT_FILE, "a+");
+	if(!fp)
+		goto out;
+
+	/*check size*/
+	struct stat _stat;
+	if(-1 == lstat(SEC_BOX_DEFAULT_FILE, &_stat)
+			|| _stat.st_size == 0)
+		goto out;
+
+	char *endptr;
+	while(fgets(buff, sizeof(buff), fp))
+	{
+		inode = strtol(buff, &endptr, 10);
+		if(inode > LONG_MIN && inode < LONG_MAX)
+			talk_to_kernel(sockfd, inode, pdaddr);
+		memset(buff, 0x0, sizeof(buff));
+	}
+
+	/*unlock*/
+	lck.l_type = F_UNLCK;
+	fcntl(flck, F_SETLK, &lck);
+out:
+	if(flck > 0)
+		close(flck);
+	if(fp > 0)
+		fclose(fp);
+
+	return;
+}
+
+
 static int init_sock(int *sockfd)
 {
 	*sockfd = socket(AF_NETLINK, SOCK_RAW, SEC_BOX_SOCK_AF);
@@ -309,6 +368,8 @@ int main(int argc, char* argv[])
 			talk_to_kernel(sockfd, *pnode, &sec_box_daddr);
 			free(pnode);
 		}
+
+		sec_box_load_clean_file(sockfd, &sec_box_daddr);
 
 		gettimeofday(&current, NULL);
 		if(current.tv_sec - start.tv_sec > 30)

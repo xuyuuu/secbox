@@ -18,7 +18,6 @@ function handler_inode()
 	lsof -p $1 | grep "$default_pattern" | while read line
 	do
 		inode_num=`echo $line | awk '{print $8}'`
-		inode_num="1234567"
 		__handler_inode $inode_num
 	done
 }
