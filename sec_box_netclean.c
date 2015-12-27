@@ -268,6 +268,7 @@ static void sec_box_load_clean_file(int sockfd, struct sockaddr_nl *pdaddr)
 		memset(buff, 0x0, sizeof(buff));
 	}
 
+
 	/*unlock*/
 	lck.l_type = F_UNLCK;
 	fcntl(flck, F_SETLK, &lck);
@@ -275,7 +276,11 @@ out:
 	if(flck > 0)
 		close(flck);
 	if(fp > 0)
+	{
 		fclose(fp);
+		truncate(SEC_BOX_DEFAULT_FILE, 0UL);
+	}
+
 
 	return;
 }
