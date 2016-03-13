@@ -220,7 +220,7 @@ int sec_box_md5sum_handler(u8 *path, u8 *digest)
 		len = fp->f_op->read(fp, kern_buf, PAGE_SIZE, &fp->f_pos);	
 		if (len > 0)
 			sec_box_md5sum.update(&context, kern_buf, len);	
-	}while(len <= 0);
+	}while(len > 0);
 
 	set_fs(oldfs);
 	fp->f_pos = oldpos;
