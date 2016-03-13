@@ -389,25 +389,41 @@ out:
 	return 0;
 }
 
+#ifndef __64bit__
 static ulong sec_box_hook_clear_mask(void)
 {
-	ulong cr0 = 0;	
-	ulong ret;
-#ifdef __32bit__
-	asm volatile("movl %%cr0, %%eax":"=r"(cr0));
-#else
-	asm volatile("movq %%cr0, %%rax":"=r"(cr0));
-#endif
-	ret = cr0;
-	cr0 &= 0xfffeffff;
-#ifdef __32bit__
-	asm volatile("movl %%eax, %%cr0"::"r"(cr0));
-#else
-	asm volatile("movq %%rax, %%cr0"::"r"(cr0));
-#endif
-
-	return ret;
+        ulong cr0 = 0;
+        ulong ret;
+        asm volatile ("movl %%cr0, %%eax"
+                        : "=a"(cr0)
+                     );  
+        ret = cr0;
+        /* clear the 20 bit of CR0, a.k.a WP bit */
+        cr0 &= 0xfffeffff;
+        asm volatile ("movl %%eax, %%cr0"
+                        :   
+                        : "a"(cr0)
+                     );  
+        return ret;
 }
+#else
+static ulong sec_box_hook_clear_mask(void)
+{
+        ulong cr0 = 0;
+        ulong ret;
+        asm volatile ("movq %%cr0, %%rax"
+                        : "=a"(cr0)
+                     );  
+        ret = cr0;
+        /* clear the 20 bit of CR0, a.k.a WP bit */
+        cr0 &= 0xfffeffff;
+        asm volatile ("movq %%rax, %%cr0"
+                        :   
+                        : "a"(cr0)
+                     );  
+        return ret;
+}
+#endif
 
 static void sec_box_hook_recover_mask(ulong val)
 {

@@ -39,19 +39,19 @@ static int __init sec_box_init(void)
 	}
 	sec_hook_address_point = (u_long *)sec_hook_address;
 
-	security_point = (struct security_operations *)sec_hook_address_point;
+	security_point = (struct security_operations *)(*sec_hook_address_point);
 	printk("security_point : %p\n", security_point);
+
+	sec_box_accesslist.init();
+	sec_box_blacklist.init();
+	sec_box_tcpstat.init();
+	sec_box_socket.handler();
 
 	write_cr0(read_cr0() & (~ 0x10000));
 	/* set hook */
 	sec_box_hook.sethook(security_point);
 
 	write_cr0(read_cr0() | 0x10000);
-
-	sec_box_accesslist.init();
-	sec_box_blacklist.init();
-	sec_box_tcpstat.init();
-	sec_box_socket.handler();
 
 	return 0;
 }
